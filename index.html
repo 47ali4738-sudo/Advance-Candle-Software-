@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OTC Candle Lab — Two-Candle Predictor</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--panel2:#17223a;--line:#263552;--text:#eef3ff;--muted:#9aabc9;--green:#31d49a;--red:#ff647c;--purple:#a78bfa;--yellow:#ffd166}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#16213d 0,#0b1020 55%);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1180px;margin:auto;padding:22px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.brand{display:flex;gap:12px;align-items:center}.logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,#8b5cf6,#22d3ee);display:grid;place-items:center;font-size:23px;font-weight:900;color:#08111f}
+h1{font-size:22px;margin:0}h2{font-size:16px;margin:0 0 12px}.sub{color:var(--muted);font-size:13px}.tag{border:1px solid #34527a;background:#132744;color:#b9d8ff;border-radius:99px;padding:6px 10px;font-size:12px}
+.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}.panel{background:linear-gradient(180deg,rgba(20,30,51,.96),rgba(14,22,39,.96));border:1px solid var(--line);border-radius:17px;padding:17px;box-shadow:0 12px 35px #0002}.wide{grid-column:1/-1}.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button,.filebtn{border:0;border-radius:10px;padding:10px 13px;background:#8b5cf6;color:white;font-weight:700;cursor:pointer}button.secondary{background:#23314e;color:#eaf0ff;border:1px solid #344765}button:disabled{opacity:.45;cursor:not-allowed}
+input,select{background:#0c1426;color:var(--text);border:1px solid #344765;border-radius:9px;padding:10px;max-width:100%}input[type=file]{max-width:100%;font-size:12px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}.stat{background:#0b1426;border:1px solid #233451;border-radius:12px;padding:12px}.stat .k{font-size:12px;color:var(--muted)}.stat .v{font-size:22px;font-weight:800;margin-top:3px}
+.predictions{display:grid;grid-template-columns:1fr 1fr;gap:12px}.prediction{border:1px solid var(--line);border-radius:14px;padding:15px;background:#0c1426}.prediction .n{font-size:12px;color:var(--muted)}.direction{font-size:27px;font-weight:900;margin:5px 0}.up{color:var(--green)}.down{color:var(--red)}.neutral{color:var(--yellow)}.meter{height:7px;background:#25334f;border-radius:99px;overflow:hidden;margin:10px 0}.meter span{height:100%;display:block;background:linear-gradient(90deg,#8b5cf6,#22d3ee)}
+.note{border-left:3px solid var(--yellow);padding:10px 12px;background:#2a2417;color:#f7e7b5;border-radius:6px;font-size:12px;margin-top:13px}
+.status{font-size:12px;color:var(--muted);margin-top:10px}.tablewrap{overflow:auto;max-height:340px}table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}th,td{text-align:left;padding:9px;border-bottom:1px solid #25334a}th{color:#b5c4df;position:sticky;top:0;background:#131d32}td{color:#e4ebfb}.pill{border-radius:7px;padding:3px 7px;font-weight:800;font-size:11px}.win{color:var(--green);background:#12382f}.loss{color:var(--red);background:#3b1c2a}.pending{color:var(--yellow);background:#3a3017}.empty{padding:22px;text-align:center;color:var(--muted);border:1px dashed #354563;border-radius:12px}
+footer{color:#8192b2;font-size:12px;margin:16px 2px}canvas{width:100%;height:180px;display:block;background:#0a1222;border-radius:10px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}.stats{grid-template-columns:1fr 1fr}.wrap{padding:13px}.predictions{grid-template-columns:1fr 1fr}.prediction{padding:11px}}
+</style>
+</head>
+<body><div class="wrap">
+<header class="top"><div class="brand"><div class="logo">◈</div><div><h1>OTC Candle Lab</h1><div class="sub">Two-candle forecasting · outcome verification · local-only prototype</div></div></div><span class="tag">EXPERIMENTAL · NO GUARANTEES</span></header>
+<div class="grid">
+<section class="panel"><h2>1. Load candle data</h2>
+<div class="sub">Import a CSV exported from a data source you are authorized to use. Required columns: open, high, low, close. Optional: time, pair.</div>
+<div class="controls" style="margin-top:13px"><input id="file" type="file" accept=".csv,text/csv"><button id="demo" class="secondary">Load demo data</button></div>
+<div class="controls" style="margin-top:12px"><label class="sub">Pair <input id="pair" value="OTC pair" style="width:130px"></label><label class="sub">Timeframe <select id="tf"><option>1 minute</option><option>5 minutes</option><option>15 minutes</option></select></label><button id="analyze">Analyze candles</button></div>
+<div class="stats"><div class="stat"><div class="k">Candles loaded</div><div class="v" id="count">0</div></div><div class="stat"><div class="k">Last close</div><div class="v" id="lastclose">—</div></div><div class="stat"><div class="k">Signals logged</div><div class="v" id="logged">0</div></div></div>
+<div class="status" id="loadstatus">No candle data loaded yet.</div>
+<div class="note">A normal website cannot read another website's live chart tab directly because of browser-origin isolation. This prototype uses imported candle data; a live connection would require an authorized Quotex data/export interface or a separately reviewed companion integration.</div>
+</section>
+<section class="panel"><h2>2. Next two candle forecasts</h2><div class="sub">Generated from historical candle features; confidence is a heuristic, not a probability guarantee.</div>
+<div class="predictions" style="margin-top:14px">
+<div class="prediction"><div class="n">NEXT CANDLE</div><div id="d1" class="direction neutral">—</div><div class="sub" id="c1">Confidence: —</div><div class="meter"><span id="m1" style="width:0%"></span></div><div class="sub" id="why1">Waiting for data</div></div>
+<div class="prediction"><div class="n">SECOND CANDLE</div><div id="d2" class="direction neutral">—</div><div class="sub" id="c2">Confidence: —</div><div class="meter"><span id="m2" style="width:0%"></span></div><div class="sub" id="why2">Waiting for data</div></div>
+</div>
+<div class="controls" style="margin-top:14px"><button id="log" disabled>Log both forecasts</button><button id="export" class="secondary">Export history CSV</button></div>
+<div class="status">Forecasts are created only when you press Analyze. They are not trading instructions.</div>
+</section>
+<section class="panel wide"><h2>3. Price history</h2><canvas id="chart" width="1000" height="220"></canvas><div class="sub" style="margin-top:8px">Close-price trace for the most recent loaded candles.</div></section>
+<section class="panel wide"><h2>4. Forecast outcome ledger</h2><div class="sub">Pending forecasts are resolved when you load a later CSV containing the corresponding future candle closes. UP = close greater than open; DOWN = close lower than open; unchanged candles are ties.</div>
+<div id="ledger" class="empty" style="margin-top:12px">No forecasts logged yet.</div></section>
+</div>
+<footer>Research prototype only. OTC prices can differ from live-market feeds. Do not use unverified forecasts as guarantees or risk money you cannot afford to lose.</footer>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let candles=[], forecasts=[], latest=null;
+function num(v){const n=Number(String(v??'').trim());return Number.isFinite(n)?n:null}
+function parseCSV(text){
+ const rows=text.replace(/^\uFEFF/,'').trim().split(/\r?\n/).map(x=>x.split(',').map(v=>v.trim().replace(/^"|"$/g,'')));
+ if(rows.length<3) throw Error('CSV needs a header and at least two candle rows.');
+ const head=rows[0].map(x=>x.toLowerCase().replace(/[^a-z0-9]/g,''));
+ const idx=(names)=>head.findIndex(h=>names.includes(h));
+ const io=idx(['open','o']), ih=idx(['high','h']), il=idx(['low','l']), ic=idx(['close','c']), it=idx(['time','timestamp','datetime','date']);
+ if([io,ih,il,ic].some(i=>i<0)) throw Error('Could not find required columns: open, high, low, close.');
+ return rows.slice(1).filter(r=>r.length>=head.length).map((r,i)=>({time:it>=0?r[it]:String(i+1),open:num(r[io]),high:num(r[ih]),low:num(r[il]),close:num(r[ic])})).filter(c=>[c.open,c.high,c.low,c.close].every(v=>v!==null));
+}
+function demoData(){
+ let out=[],p=0.9048,seed=89173;
+ const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+ for(let i=0;i<180;i++){let drift=(rand()-.505)*.00042;let o=p,c=o+drift,wig=(rand()*.00012);out.push({time:new Date(Date.now()-(180-i)*60000).toISOString(),open:o,high:Math.max(o,c)+wig,low:Math.min(o,c)-wig,close:c});p=c}
+ return out;
+}
+function features(arr){
+ const n=arr.length, last=arr[n-1], ret=[], bodies=[], ranges=[];
+ for(let i=Math.max(0,n-20);i<n;i++){let c=arr[i], prev=arr[i-1]; bodies.push((c.close-c.open)/(c.high-c.low||1e-9));ranges.push((c.high-c.low)/(c.close||1));if(prev)ret.push((c.close-prev.close)/(prev.close||1))}
+ const avg=a=>a.reduce((s,x)=>s+x,0)/(a.length||1);
+ const momentum=ret.slice(-5).reduce((s,x)=>s+x,0), short=ret.slice(-3).reduce((s,x)=>s+x,0);
+ const trend=avg(ret.slice(-8)), vol=avg(ranges), body=avg(bodies.slice(-5));
+ const prev=arr[n-2], lastBody=(last.close-last.open)/(last.high-last.low||1e-9);
+ // Heuristic score: blend short momentum, recent trend, candle body, and reversal penalty.
+ let score=0.38*Math.tanh(momentum*22000)+0.26*Math.tanh(trend*45000)+0.22*Math.tanh(lastBody*1.6)+0.14*Math.tanh(short*25000);
+ if(Math.abs(lastBody)>.75 && Math.sign(lastBody)!==Math.sign(momentum) && Math.abs(momentum)>.00001) score*=.72;
+ const strength=Math.min(.78,Math.max(.51,.51+Math.abs(score)*.25));
+ return {score,confidence:strength,vol,lastBody,trend,momentum};
+}
+function forecast(arr,horizon){
+ const f=features(arr);
+ // Slightly decay confidence for the second horizon.
+ const s=f.score*(horizon===2?.72:1);
+ const direction=Math.abs(s)<.055?'NO CLEAR EDGE':(s>0?'UP':'DOWN');
+ const confidence=Math.round((direction==='NO CLEAR EDGE'?.50:Math.min(.75,.51+Math.abs(s)*.24))*100);
+ let why=Math.abs(f.momentum)>0.00002?'recent momentum':Math.abs(f.lastBody)>.35?'last candle body':'mixed short-term features';
+ return {direction,confidence,why,score:s};
+}
+function renderPred(id,p){
+ $(id).textContent=p.direction==='UP'?'UP ↑':p.direction==='DOWN'?'DOWN ↓':'NO CLEAR EDGE';
+ $(id).className='direction '+(p.direction==='UP'?'up':p.direction==='DOWN'?'down':'neutral');
+ const numid=id==='d1'?'c1':'c2', mid=id==='d1'?'m1':'m2', wid=id==='d1'?'why1':'why2';
+ $(numid).textContent='Heuristic confidence: '+p.confidence+'%';
+ $(mid).style.width=p.confidence+'%';$(wid).textContent='Driver: '+p.why;
+}
+function analyze(){
+ if(candles.length<30){$('loadstatus').textContent='Load at least 30 valid candles for a basic analysis.';return}
+ latest={p1:forecast(candles,1),p2:forecast(candles,2),at:candles[candles.length-1].time,close:candles[candles.length-1].close,pair:$('pair').value,tf:$('tf').value};
+ renderPred('d1',latest.p1);renderPred('d2',latest.p2);$('log').disabled=false;
+ $('loadstatus').textContent='Analyzed '+candles.length+' candles. Forecast anchored at last close '+latest.close+'.';
+ drawChart();
+}
+function resolvePending(){
+ for(const f of forecasts){if(f.result1==='PENDING'&&candles.length>f.anchorIndex+1){const c=candles[f.anchorIndex+1];f.result1=outcome(c,f.p1);f.actual1=c.close}
+ if(f.result2==='PENDING'&&candles.length>f.anchorIndex+2){const c=candles[f.anchorIndex+2];f.result2=outcome(c,f.p2);f.actual2=c.close}}
+}
+function outcome(c,p){const d=c.close>c.open?'UP':c.close<c.open?'DOWN':'TIE';return p==='NO CLEAR EDGE'?'UNSCORED':d===p?'WIN':d==='TIE'?'TIE':'LOSS'}
+function logForecasts(){
+ if(!latest)return;
+ forecasts.push({id:forecasts.length+1,pair:latest.pair,tf:latest.tf,anchorTime:latest.at,anchorClose:latest.close,anchorIndex:candles.length-1,p1:latest.p1.direction,c1:latest.p1.confidence,p2:latest.p2.direction,c2:latest.p2.confidence,result1:'PENDING',result2:'PENDING'});
+ $('logged').textContent=forecasts.length;renderLedger();$('log').disabled=true;
+}
+function renderLedger(){
+ if(!forecasts.length){$('ledger').className='empty';$('ledger').textContent='No forecasts logged yet.';return}
+ let wins=0,loss=0,resolved=0;
+ for(const f of forecasts)for(const k of ['result1','result2']){if(f[k]==='WIN'){wins++;resolved++}else if(f[k]==='LOSS'){loss++;resolved++}else if(f[k]==='TIE')resolved++}
+ $('ledger').className='tablewrap';
+ $('ledger').innerHTML='<div class="stats" style="margin:0 0 12px"><div class="stat"><div class="k">Resolved outcomes</div><div class="v">'+resolved+'</div></div><div class="stat"><div class="k">Wins</div><div class="v up">'+wins+'</div></div><div class="stat"><div class="k">Losses</div><div class="v down">'+loss+'</div></div></div><table><thead><tr><th>#</th><th>Pair / TF</th><th>Anchor time</th><th>Candle 1</th><th>Result</th><th>Candle 2</th><th>Result</th></tr></thead><tbody>'+forecasts.slice().reverse().map(f=>'<tr><td>'+f.id+'</td><td>'+esc(f.pair)+' / '+esc(f.tf)+'</td><td>'+esc(f.anchorTime)+'</td><td>'+f.p1+' ('+f.c1+'%)</td><td>'+badge(f.result1)+'</td><td>'+f.p2+' ('+f.c2+'%)</td><td>'+badge(f.result2)+'</td></tr>').join('')+'</tbody></table>';
+}
+function badge(x){return '<span class="pill '+(x==='WIN'?'win':x==='LOSS'?'loss':'pending')+'">'+x+'</span>'}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function drawChart(){
+ const cv=$('chart'),ctx=cv.getContext('2d'),w=cv.width,h=cv.height;ctx.clearRect(0,0,w,h);
+ const a=candles.slice(-90);if(!a.length)return;
+ const vals=a.map(c=>c.close),lo=Math.min(...vals),hi=Math.max(...vals),pad=(hi-lo||.0001)*.12;
+ ctx.strokeStyle='#233451';ctx.lineWidth=1;for(let i=1;i<5;i++){let y=h*i/5;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
+ ctx.strokeStyle='#54d9e8';ctx.lineWidth=2;ctx.beginPath();a.forEach((c,i)=>{let x=i/(a.length-1||1)*w,y=h-18-(c.close-(lo-pad))/(hi-lo+2*pad)*(h-36);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});ctx.stroke();
+}
+function exportCSV(){
+ const headers=['id','pair','timeframe','anchor_time','anchor_close','next_prediction','next_confidence','next_result','second_prediction','second_confidence','second_result'];
+ const rows=forecasts.map(f=>[f.id,f.pair,f.tf,f.anchorTime,f.anchorClose,f.p1,f.c1,f.result1,f.p2,f.c2,f.result2]);
+ const csv=[headers,...rows].map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n');
+ const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'})),a=document.createElement('a');a.href=url;a.download='otc-candle-history.csv';a.click();URL.revokeObjectURL(url);
+}
+$('file').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{candles=parseCSV(await f.text());resolvePending();$('count').textContent=candles.length;$('lastclose').textContent=candles.at(-1)?.close??'—';$('loadstatus').textContent='Loaded '+f.name;drawChart();renderLedger()}catch(err){$('loadstatus').textContent=err.message}});
+$('demo').onclick=()=>{candles=demoData();$('count').textContent=candles.length;$('lastclose').textContent=candles.at(-1).close.toFixed(6);$('loadstatus').textContent='Demo data loaded (synthetic, not Quotex prices).';drawChart()};
+$('analyze').onclick=analyze;$('log').onclick=logForecasts;$('export').onclick=exportCSV;
+</script></body></html>
